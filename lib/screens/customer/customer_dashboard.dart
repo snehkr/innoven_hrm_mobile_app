@@ -245,6 +245,69 @@ class _CustomerDashboardState extends State<CustomerDashboard>
     );
   }
 
+  void _showProductDetails(Map product) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 24),
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: _kPrimary.withOpacity(0.1), borderRadius: BorderRadius.circular(14)),
+                  child: const Icon(Icons.tv_rounded, color: _kPrimary, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(product['model_name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  Text(product['brand'] ?? 'InnoVen', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+                ])),
+              ]),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 16),
+              _DetailRow(Icons.qr_code_rounded, 'Serial Number', product['serial_number'] ?? 'N/A'),
+              _DetailRow(Icons.barcode_reader, 'Barcode', product['barcode'] ?? 'N/A'),
+              _DetailRow(Icons.receipt_rounded, 'Invoice No.', product['invoice_number'] ?? 'N/A'),
+              _DetailRow(Icons.verified_user_rounded, 'Warranty', '${product['warranty_period_months'] ?? 12} Months'),
+              _DetailRow(
+                Icons.calendar_month_rounded, 
+                product['purchase_date'] != null ? 'Purchase Date' : 'Registered On', 
+                (product['purchase_date'] ?? product['createdAt'])?.toString().split(' ').first.split('T').first ?? 'N/A'
+              ),
+              _DetailRow(Icons.store_rounded, 'Retailer', product['registered_by']?['name'] ?? 'N/A'),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showLogoutDialog(AuthProvider auth) {
     showDialog(
       context: context,
@@ -338,7 +401,11 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                 mainAxisSpacing: 12,
               ),
               itemCount: _products.length,
-              itemBuilder: (ctx, i) => _ProductCard(product: _products[i], compact: true),
+              itemBuilder: (ctx, i) => _ProductCard(
+                product: _products[i],
+                compact: true,
+                onTap: () => _showProductDetails(_products[i]),
+              ),
             )
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -347,7 +414,10 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                 padding: const EdgeInsets.only(bottom: 12),
                 child: FadeSlide(
                   delay: Duration(milliseconds: i * 50),
-                  child: _ProductCard(product: _products[i]),
+                  child: _ProductCard(
+                    product: _products[i],
+                    onTap: () => _showProductDetails(_products[i]),
+                  ),
                 ),
               ),
             ),
@@ -394,15 +464,19 @@ class _CustomerDashboardState extends State<CustomerDashboard>
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   final bool compact;
+  final VoidCallback? onTap;
 
-  const _ProductCard({required this.product, this.compact = false});
+  const _ProductCard({required this.product, this.compact = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final warranty = product['warranty_period_months'] ?? 12;
     final brand = product['brand'] ?? '';
 
-    return Container(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
       decoration: BoxDecoration(
         color: _kCard,
         borderRadius: BorderRadius.circular(16),
@@ -416,6 +490,7 @@ class _ProductCard extends StatelessWidget {
       child: compact
           ? _buildCompact(brand, warranty)
           : _buildFull(brand, warranty),
+      ),
     );
   }
 
@@ -777,6 +852,33 @@ class _InfoRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis),
         ),
       ],
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _DetailRow(this.icon, this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: _kPrimary.withOpacity(0.7)),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
+              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
