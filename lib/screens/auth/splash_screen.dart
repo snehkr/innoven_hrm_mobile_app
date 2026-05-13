@@ -49,11 +49,21 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigate() async {
+    // Wait for minimum splash duration
     await Future.delayed(const Duration(milliseconds: 2400));
     if (!mounted) return;
+    
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Wait for AuthProvider to finish loading persistent session
+    while (authProvider.isLoading) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    
+    if (!mounted) return;
+
     if (authProvider.isAuthenticated) {
-      final role = authProvider.user!['role'];
+      final role = authProvider.user?['role'];
       if (role == 'engineer') {
         context.go('/engineer');
       } else {

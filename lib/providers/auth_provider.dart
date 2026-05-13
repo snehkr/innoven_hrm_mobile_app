@@ -22,6 +22,11 @@ class AuthProvider with ChangeNotifier {
   Future<void> _loadUser() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('jwt_token');
+    final savedUser = prefs.getString('user_data');
+    
+    if (savedUser != null) {
+      _user = jsonDecode(savedUser);
+    }
     
     if (_token != null) {
       try {
@@ -29,11 +34,15 @@ class AuthProvider with ChangeNotifier {
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           _user = data['data']['user'];
-        } else {
+          // Update cached user data
+          await prefs.setString('user_data', jsonEncode(_user));
+        } else if (res.statusCode == 401) {
+          // Only logout if explicitly unauthorized
           await logout();
         }
       } catch (e) {
-        await logout();
+        // On network error, keep existing token and user data for offline access
+        debugPrint('Network error during auto-login: $e');
       }
     }
     _isLoading = false;
@@ -54,6 +63,7 @@ class AuthProvider with ChangeNotifier {
         
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', _token!);
+        await prefs.setString('user_data', jsonEncode(_user));
         
         notifyListeners();
         return true;
@@ -69,6 +79,7 @@ class AuthProvider with ChangeNotifier {
     _user = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt_token');
+    await prefs.remove('user_data');
     notifyListeners();
   }
 }
