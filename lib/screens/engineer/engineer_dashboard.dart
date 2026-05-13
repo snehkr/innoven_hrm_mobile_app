@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/skeleton_loader.dart';
+import '../../widgets/fade_slide.dart';
 
 const _kPrimary  = Color(0xFF0D47A1);
 const _kBg       = Color(0xFFF1F4F9);
@@ -38,7 +41,10 @@ class _EngineerDashboardState extends State<EngineerDashboard>
 
   Future<void> _fetchJobs({bool silent = false}) async {
     if (!silent) setState(() => _isLoading = true);
-    else setState(() => _isRefreshing = true);
+    else {
+      setState(() => _isRefreshing = true);
+      HapticFeedback.lightImpact();
+    }
     try {
       final responses = await Future.wait([
         _apiService.get('/installations/assigned'),
@@ -167,56 +173,58 @@ class _EngineerDashboardState extends State<EngineerDashboard>
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 24),
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: _kPrimary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.assignment_rounded, color: _kPrimary),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 24),
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: _kPrimary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.assignment_rounded, color: _kPrimary),
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Ticket #${job['ticket_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  Text(status.replaceAll('_', ' '), style: TextStyle(color: _statusColor(status), fontSize: 12, fontWeight: FontWeight.bold)),
+                ])),
+              ]),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 12),
+              _ActionTile(
+                icon: Icons.phone_rounded, color: const Color(0xFF22C55E),
+                label: 'Call Customer', sub: phone ?? 'No number',
+                onTap: () {
+                  Navigator.pop(context);
+                  if (phone != null) {
+                    // Use url_launcher or similar here
+                    _snack('Calling $phone...');
+                  }
+                },
               ),
-              const SizedBox(width: 16),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Ticket #${job['ticket_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                Text(status.replaceAll('_', ' '), style: TextStyle(color: _statusColor(status), fontSize: 12, fontWeight: FontWeight.bold)),
-              ])),
-            ]),
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 12),
-            _ActionTile(
-              icon: Icons.phone_rounded, color: const Color(0xFF22C55E),
-              label: 'Call Customer', sub: phone ?? 'No number',
-              onTap: () {
-                Navigator.pop(context);
-                if (phone != null) {
-                  // Use url_launcher or similar here
-                  _snack('Calling $phone...');
-                }
-              },
-            ),
-            _ActionTile(
-              icon: Icons.edit_note_rounded, color: const Color(0xFF6366F1),
-              label: 'Update Status', sub: 'Add notes or change status',
-              onTap: () {
-                Navigator.pop(context);
-                _snack('Status update coming soon');
-              },
-            ),
-            _ActionTile(
-              icon: Icons.info_outline_rounded, color: Colors.blue,
-              label: 'View Full Details', sub: 'Customer & Product history',
-              onTap: () {
-                Navigator.pop(context);
-                _snack('Details view coming soon');
-              },
-            ),
-            const SizedBox(height: 12),
-          ],
+              _ActionTile(
+                icon: Icons.edit_note_rounded, color: const Color(0xFF6366F1),
+                label: 'Update Status', sub: 'Add notes or change status',
+                onTap: () {
+                  Navigator.pop(context);
+                  _snack('Status update coming soon');
+                },
+              ),
+              _ActionTile(
+                icon: Icons.info_outline_rounded, color: Colors.blue,
+                label: 'View Full Details', sub: 'Customer & Product history',
+                onTap: () {
+                  Navigator.pop(context);
+                  _snack('Details view coming soon');
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       ),
     );
@@ -233,7 +241,7 @@ class _EngineerDashboardState extends State<EngineerDashboard>
       backgroundColor: _kBg,
       appBar: _buildAppBar(user, auth, isLandscape),
       body: _isLoading
-          ? const _Loader()
+          ? _Loader(isLandscape: isLandscape)
           : Column(children: [
               _buildTabBar(),
               Expanded(child: TabBarView(
@@ -248,7 +256,7 @@ class _EngineerDashboardState extends State<EngineerDashboard>
     final name = user?['name']?.toString().split(' ').first ?? 'Engineer';
     final email = user?['email']?.toString() ?? '';
     return PreferredSize(
-      preferredSize: Size.fromHeight(isLandscape ? 88 : 150),
+      preferredSize: Size.fromHeight(isLandscape ? 100 : 165),
       child: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -316,13 +324,13 @@ class _EngineerDashboardState extends State<EngineerDashboard>
         const SizedBox(height: 10),
         // Stats row
         Row(children: [
-          Expanded(child: _StatChip(label: 'Total',   value: _jobs.length, color: Colors.white24,                              icon: Icons.assignment_rounded)),
+          Expanded(child: FadeSlide(delay: const Duration(milliseconds: 100), child: _StatChip(label: 'Total',   value: _jobs.length, color: Colors.white24, icon: Icons.assignment_rounded))),
           const SizedBox(width: 6),
-          Expanded(child: _StatChip(label: 'Pending', value: _pending,     color: const Color(0xFFF59E0B).withOpacity(0.35),   icon: Icons.schedule_rounded)),
+          Expanded(child: FadeSlide(delay: const Duration(milliseconds: 200), child: _StatChip(label: 'Pending', value: _pending,     color: const Color(0xFFF59E0B), icon: Icons.schedule_rounded))),
           const SizedBox(width: 6),
-          Expanded(child: _StatChip(label: 'Active',  value: _active,      color: const Color(0xFF6366F1).withOpacity(0.35),   icon: Icons.engineering_rounded)),
+          Expanded(child: FadeSlide(delay: const Duration(milliseconds: 300), child: _StatChip(label: 'Active',  value: _active,      color: const Color(0xFF6366F1), icon: Icons.engineering_rounded))),
           const SizedBox(width: 6),
-          Expanded(child: _StatChip(label: 'Done',    value: _completed,   color: const Color(0xFF22C55E).withOpacity(0.35),   icon: Icons.check_circle_rounded)),
+          Expanded(child: FadeSlide(delay: const Duration(milliseconds: 400), child: _StatChip(label: 'Done',    value: _completed,   color: const Color(0xFF22C55E), icon: Icons.check_circle_rounded))),
         ]),
       ],
     );
@@ -337,11 +345,11 @@ class _EngineerDashboardState extends State<EngineerDashboard>
         Text(email, style: const TextStyle(fontSize: 11, color: Color(0xB3FFFFFF)), overflow: TextOverflow.ellipsis),
       ])),
       const SizedBox(width: 10),
-      _StatChip(label: 'Pending', value: _pending,   color: const Color(0xFFF59E0B).withOpacity(0.35), icon: Icons.schedule_rounded),
+      _StatChip(label: 'Pending', value: _pending,   color: const Color(0xFFF59E0B), icon: Icons.schedule_rounded, compact: true),
       const SizedBox(width: 6),
-      _StatChip(label: 'Active',  value: _active,    color: const Color(0xFF6366F1).withOpacity(0.35), icon: Icons.engineering_rounded),
+      _StatChip(label: 'Active',  value: _active,    color: const Color(0xFF6366F1), icon: Icons.engineering_rounded, compact: true),
       const SizedBox(width: 6),
-      _StatChip(label: 'Done',    value: _completed, color: const Color(0xFF22C55E).withOpacity(0.35), icon: Icons.check_circle_rounded),
+      _StatChip(label: 'Done',    value: _completed, color: const Color(0xFF22C55E), icon: Icons.check_circle_rounded, compact: true),
       const SizedBox(width: 10),
       _isRefreshing
           ? Container(
@@ -439,11 +447,14 @@ class _EngineerDashboardState extends State<EngineerDashboard>
               itemCount: list.length,
               itemBuilder: (_, i) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
-                child: _JobCard(
-                  job: list[i], statusColor: _statusColor(list[i]['status'] ?? ''),
-                  actionConfig: _actionConfig(list[i]),
-                  onAction: (route) => context.go(route),
-                  onMore: () => _showQuickActions(list[i]),
+                child: FadeSlide(
+                  delay: Duration(milliseconds: i * 50),
+                  child: _JobCard(
+                    job: list[i], statusColor: _statusColor(list[i]['status'] ?? ''),
+                    actionConfig: _actionConfig(list[i]),
+                    onAction: (route) => context.go(route),
+                    onMore: () => _showQuickActions(list[i]),
+                  ),
                 ),
               ),
             ),
@@ -644,16 +655,25 @@ class _StatChip extends StatelessWidget {
   final int value;
   final Color color;
   final IconData icon;
-  const _StatChip({required this.label, required this.value, required this.color, required this.icon});
+  final bool compact;
+  const _StatChip({required this.label, required this.value, required this.color, required this.icon, this.compact = false});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12)),
+    padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 6 : 10),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.15),
+      borderRadius: BorderRadius.circular(compact ? 12 : 16),
+      border: Border.all(color: color.withOpacity(0.3), width: 1),
+    ),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, color: Colors.white, size: 16),
-      const SizedBox(height: 2),
-      Text('$value', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-      Text(label, style: const TextStyle(color: Colors.white70, fontSize: 9)),
+      Container(
+        padding: EdgeInsets.all(compact ? 3 : 4),
+        decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+        child: Icon(icon, color: Colors.white, size: compact ? 12 : 14),
+      ),
+      SizedBox(height: compact ? 2 : 4),
+      Text('$value', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: compact ? 14 : 18)),
+      Text(label, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: compact ? 7 : 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
     ]),
   );
 }
@@ -697,14 +717,13 @@ class _AppBarIconBtn extends StatelessWidget {
 }
 
 class _Loader extends StatelessWidget {
-  const _Loader();
+  final bool isLandscape;
+  const _Loader({this.isLandscape = false});
   @override
-  Widget build(BuildContext context) => const Scaffold(
-    backgroundColor: _kBg,
-    body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      CircularProgressIndicator(color: _kPrimary),
-      SizedBox(height: 16),
-      Text('Loading jobs...', style: TextStyle(color: Colors.grey)),
-    ])),
-  );
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _kBg,
+      body: isLandscape ? SkeletonLoader.grid() : SkeletonLoader.card(),
+    );
+  }
 }

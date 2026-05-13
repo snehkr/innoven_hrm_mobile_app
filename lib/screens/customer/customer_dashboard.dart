@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/skeleton_loader.dart';
+import '../../widgets/fade_slide.dart';
 
 // ── Color Palette ──────────────────────────────────────────────────────────
 const _kPrimary = Color(0xFF0D47A1);
@@ -43,7 +46,10 @@ class _CustomerDashboardState extends State<CustomerDashboard>
 
   Future<void> _fetchData({bool silent = false}) async {
     if (!silent) setState(() => _isLoading = true);
-    else setState(() => _isRefreshing = true);
+    else {
+      setState(() => _isRefreshing = true);
+      HapticFeedback.lightImpact();
+    }
 
     try {
       final productRes = await _apiService.get('/products');
@@ -124,7 +130,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
       backgroundColor: _kBg,
       appBar: _buildAppBar(user, authProvider, isLandscape),
       body: _isLoading
-          ? const _LoadingView()
+          ? _LoadingView(isLandscape: isLandscape)
           : Column(
               children: [
                 _buildTabBar(),
@@ -339,7 +345,10 @@ class _CustomerDashboardState extends State<CustomerDashboard>
               itemCount: _products.length,
               itemBuilder: (ctx, i) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _ProductCard(product: _products[i]),
+                child: FadeSlide(
+                  delay: Duration(milliseconds: i * 50),
+                  child: _ProductCard(product: _products[i]),
+                ),
               ),
             ),
     );
@@ -366,10 +375,13 @@ class _CustomerDashboardState extends State<CustomerDashboard>
           final req = _requests[i];
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: _RequestCard(
-              req: req,
-              statusColor: _statusColor(req['status'] ?? 'PENDING'),
-              statusIcon: _statusIcon(req['status'] ?? 'PENDING'),
+            child: FadeSlide(
+              delay: Duration(milliseconds: i * 50),
+              child: _RequestCard(
+                req: req,
+                statusColor: _statusColor(req['status'] ?? 'PENDING'),
+                statusIcon: _statusIcon(req['status'] ?? 'PENDING'),
+              ),
             ),
           );
         },
@@ -676,6 +688,31 @@ class _RequestCard extends StatelessWidget {
                     _InfoRow(Icons.description_rounded, 'Issue',
                         req['issue_description']),
                   ],
+                  // Timeline Section
+                  if (req['timeline'] != null && (req['timeline'] as List).isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Activity History',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey)),
+                    ),
+                    const SizedBox(height: 12),
+                    ...(req['timeline'] as List).asMap().entries.map((entry) {
+                      final item = entry.value as Map;
+                      final isLast = entry.key == (req['timeline'] as List).length - 1;
+                      return _TimelineItem(
+                        status: item['status'] ?? 'UPDATE',
+                        note: item['note'] ?? '',
+                        time: item['timestamp'] ?? item['time'] ?? '',
+                        isLast: isLast,
+                      );
+                    }).toList(),
+                  ],
                   if ((req['status'] == 'INSTALLATION_COMPLETED' ||
                           req['status'] == 'COMPLETED') &&
                       proofUrl != null) ...[
@@ -744,6 +781,68 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
+class _TimelineItem extends StatelessWidget {
+  final String status;
+  final String note;
+  final String time;
+  final bool isLast;
+
+  const _TimelineItem({
+    required this.status,
+    required this.note,
+    required this.time,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final date = time.isNotEmpty ? DateTime.parse(time).toLocal() : DateTime.now();
+    final timeStr = "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')} • ${date.day}/${date.month}";
+
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 8, height: 8,
+                decoration: const BoxDecoration(color: _kPrimary, shape: BoxShape.circle),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(width: 2, color: _kPrimary.withOpacity(0.2)),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(status.replaceAll('_', ' '),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text(timeStr, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                    ],
+                  ),
+                  if (note.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(note, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Empty State ───────────────────────────────────────────────────────────────
 class _EmptyState extends StatelessWidget {
   final IconData icon;
@@ -808,23 +907,14 @@ class _EmptyState extends StatelessWidget {
 
 // ── Loading view ──────────────────────────────────────────────────────────────
 class _LoadingView extends StatelessWidget {
-  const _LoadingView();
+  final bool isLandscape;
+  const _LoadingView({this.isLandscape = false});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: _kBg,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: _kPrimary),
-            SizedBox(height: 16),
-            Text('Loading your data...',
-                style: TextStyle(color: Colors.grey, fontSize: 14)),
-          ],
-        ),
-      ),
+      body: isLandscape ? SkeletonLoader.grid() : SkeletonLoader.card(),
     );
   }
 }
