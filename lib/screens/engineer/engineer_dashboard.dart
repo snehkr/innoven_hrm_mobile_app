@@ -153,6 +153,75 @@ class _EngineerDashboardState extends State<EngineerDashboard>
   int get _active    => _filter('IN_PROGRESS').length;
   int get _completed => _jobs.where((j) => const ['INSTALLATION_COMPLETED', 'COMPLETED'].contains(j['status'])).length;
 
+  void _showQuickActions(dynamic job) {
+    final status = job['status'] ?? 'PENDING';
+    final customer = job['customer_id'] as Map?;
+    final phone = customer?['phone']?.toString();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 24),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: _kPrimary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.assignment_rounded, color: _kPrimary),
+              ),
+              const SizedBox(width: 16),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Ticket #${job['ticket_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(status.replaceAll('_', ' '), style: TextStyle(color: _statusColor(status), fontSize: 12, fontWeight: FontWeight.bold)),
+              ])),
+            ]),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 12),
+            _ActionTile(
+              icon: Icons.phone_rounded, color: const Color(0xFF22C55E),
+              label: 'Call Customer', sub: phone ?? 'No number',
+              onTap: () {
+                Navigator.pop(context);
+                if (phone != null) {
+                  // Use url_launcher or similar here
+                  _snack('Calling $phone...');
+                }
+              },
+            ),
+            _ActionTile(
+              icon: Icons.edit_note_rounded, color: const Color(0xFF6366F1),
+              label: 'Update Status', sub: 'Add notes or change status',
+              onTap: () {
+                Navigator.pop(context);
+                _snack('Status update coming soon');
+              },
+            ),
+            _ActionTile(
+              icon: Icons.info_outline_rounded, color: Colors.blue,
+              label: 'View Full Details', sub: 'Customer & Product history',
+              onTap: () {
+                Navigator.pop(context);
+                _snack('Details view coming soon');
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -361,6 +430,7 @@ class _EngineerDashboardState extends State<EngineerDashboard>
                 job: list[i], statusColor: _statusColor(list[i]['status'] ?? ''),
                 actionConfig: _actionConfig(list[i]),
                 onAction: (route) => context.go(route),
+                onMore: () => _showQuickActions(list[i]),
                 compact: true,
               ),
             )
@@ -373,6 +443,7 @@ class _EngineerDashboardState extends State<EngineerDashboard>
                   job: list[i], statusColor: _statusColor(list[i]['status'] ?? ''),
                   actionConfig: _actionConfig(list[i]),
                   onAction: (route) => context.go(route),
+                  onMore: () => _showQuickActions(list[i]),
                 ),
               ),
             ),
@@ -386,11 +457,13 @@ class _JobCard extends StatelessWidget {
   final Color statusColor;
   final Map<String, dynamic> actionConfig;
   final void Function(String) onAction;
+  final VoidCallback onMore;
   final bool compact;
 
   const _JobCard({
     required this.job, required this.statusColor,
     required this.actionConfig, required this.onAction,
+    required this.onMore,
     this.compact = false,
   });
 
@@ -461,6 +534,13 @@ class _JobCard extends StatelessWidget {
               child: Text(status.replaceAll('_', ' '),
                   style: TextStyle(color: statusColor, fontSize: compact ? 8 : 10, fontWeight: FontWeight.w700)),
             ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.more_vert_rounded, size: 20, color: Colors.grey),
+              onPressed: onMore,
+              constraints: const BoxConstraints(),
+              padding: EdgeInsets.zero,
+            ),
           ]),
           SizedBox(height: compact ? 8 : 12),
           // Customer + product info
@@ -518,6 +598,30 @@ class _JobCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String sub;
+  final VoidCallback onTap;
+
+  const _ActionTile({required this.icon, required this.color, required this.label, required this.sub, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    leading: Container(
+      width: 44, height: 44,
+      decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+      child: Icon(icon, color: color, size: 22),
+    ),
+    title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+    subtitle: Text(sub, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+    trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+    onTap: onTap,
+  );
 }
 
 class _InfoLine extends StatelessWidget {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 
 const _kPrimary = Color(0xFF0D47A1);
@@ -52,6 +53,10 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
 
   Future<void> _processBarcode(String value) async {
     if (_isProcessing) return;
+    
+    // Trigger haptic feedback on detection
+    HapticFeedback.lightImpact();
+    
     setState(() => _isProcessing = true);
 
     try {
